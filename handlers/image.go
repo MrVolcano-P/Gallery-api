@@ -30,6 +30,11 @@ type NewImage struct {
 }
 
 func (ih *ImageHandler) CreateImage(c *gin.Context) {
+	getToken, isToken := c.Get("token")
+	if !isToken {
+		fmt.Println("err")
+	}
+	fmt.Println(getToken)
 	idString := c.Param("id")
 	id, err := strconv.Atoi(idString)
 	if err != nil {

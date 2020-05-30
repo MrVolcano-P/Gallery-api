@@ -2,6 +2,7 @@ package main
 
 import (
 	"gallery0api/handlers"
+	"gallery0api/middleware"
 	"gallery0api/models"
 	"log"
 
@@ -43,14 +44,6 @@ func main() {
 
 	gh := handlers.NewGalleryHandler(gg)
 
-	r.GET("/gallerys", gh.ListGallery)
-
-	r.POST("/gallerys", gh.CreateGallery)
-
-	r.PUT("/gallerys/:id", gh.UpdateGallery)
-
-	r.DELETE("/gallerys/:id", gh.DeleteGallery)
-
 	ug := models.NewUserGorm(db)
 
 	uh := handlers.NewUserHandler(ug)
@@ -63,9 +56,32 @@ func main() {
 
 	ih := handlers.NewImageHandler(ig)
 
-	r.POST("/images/:id", ih.CreateImage)
+	mg := r.Group("")
+	mg.Use(middleware.RequireUser(ug))
+	{
+		mg.GET("/gallerys", gh.ListGallery)
 
-	r.GET("/images/:id", ih.GetImagesByGalleryID)
+		mg.POST("/gallerys", gh.CreateGallery)
+
+		mg.PUT("/gallerys/:id", gh.UpdateGallery)
+
+		mg.DELETE("/gallerys/:id", gh.DeleteGallery)
+
+		mg.POST("/images/:id", ih.CreateImage)
+
+		mg.GET("/images/:id", ih.GetImagesByGalleryID)
+
+		mg.GET("/sessions", func(c *gin.Context) {
+			user, ok := c.Value("user").(*models.UserTable)
+			if !ok {
+				c.JSON(401, gin.H{
+					"message": "invalid token",
+				})
+				return
+			}
+			c.JSON(200, user)
+		})
+	}
 
 	r.Run()
 }

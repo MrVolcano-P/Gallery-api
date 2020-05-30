@@ -1,7 +1,12 @@
 package models
 
 import (
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/base64"
+	"fmt"
 	"gallery0api/rand"
+	"hash"
 
 	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
@@ -18,16 +23,21 @@ type UserTable struct {
 type UserService interface {
 	CreateUser(user *UserTable) error
 	Login(user *UserTable) (string, error)
+	GetByToken(token string) (*UserTable, error)
 }
 
 var _ UserService = &UserGorm{}
 
 type UserGorm struct {
-	db *gorm.DB
+	db   *gorm.DB
+	hmac hash.Hash
 }
 
+const hmackey = "secret"
+
 func NewUserGorm(db *gorm.DB) UserService {
-	return &UserGorm{db}
+	mac := hmac.New(sha256.New, []byte(hmackey))
+	return &UserGorm{db, mac}
 }
 
 func (ug *UserGorm) CreateUser(user *UserTable) error {
@@ -49,11 +59,26 @@ func (ug *UserGorm) Login(user *UserTable) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Println("token", token)
+	ug.hmac.Write([]byte(token))
+	hash := ug.hmac.Sum(nil)
+	ug.hmac.Reset()
+	fmt.Println("hash", base64.URLEncoding.EncodeToString(hash))
+	encode := base64.URLEncoding.EncodeToString(hash)
 	err = ug.db.Model(&UserTable{}).
 		Where("id = ?", found.ID).
-		Update("token", token).Error
+		Update("token", encode).Error
 	if err != nil {
 		return "", err
 	}
 	return token, nil
+}
+
+func (ug *UserGorm) GetByToken(token string) (*UserTable, error) {
+	user := &UserTable{}
+	err := ug.db.Where("token = ?", token).First(&user).Error
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }

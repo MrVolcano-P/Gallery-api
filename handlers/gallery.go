@@ -47,6 +47,8 @@ type NewGallery struct {
 }
 
 func (gh *GalleryHandler) CreateGallery(c *gin.Context) {
+	
+
 	data := new(NewGallery)
 	if err := c.BindJSON(data); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
