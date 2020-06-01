@@ -38,7 +38,7 @@ func main() {
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
-	
+
 	hmac := hash.NewHMAC(os.Getenv("hmackey"))
 	gs := models.NewGalleryService(db)
 	ims := models.NewImageService(db)

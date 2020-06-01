@@ -25,6 +25,7 @@ type UserService interface {
 	Login(user *User) (string, error)
 	GetByToken(token string) (*User, error)
 	Logout(user *User) error
+	GetByID(id uint) (*User, error)
 }
 
 func NewUserService(db *gorm.DB, hmac *hash.HMAC) UserService {
@@ -101,6 +102,14 @@ func (ug *userGorm) GetByToken(token string) (*User, error) {
 	user := new(User)
 	err := ug.db.Where("token = ?", tokenHash).First(user).Error
 	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
+func (ug *userGorm) GetByID(id uint) (*User, error) {
+	user := new(User)
+	if err := ug.db.First(user, id).Error; err != nil {
 		return nil, err
 	}
 	return user, nil

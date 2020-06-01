@@ -56,11 +56,11 @@ func (gh *GalleryHandler) Create(c *gin.Context) {
 }
 
 func (gh *GalleryHandler) ListPublish(c *gin.Context) {
-	user := context.User(c)
-	if user == nil {
-		c.Status(401)
-		return
-	}
+	// user := context.User(c)
+	// if user == nil {
+	// 	c.Status(401)
+	// 	return
+	// }
 	data, err := gh.gs.ListAllPublish()
 	if err != nil {
 		Error(c, 500, err)
