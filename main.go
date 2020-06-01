@@ -1,9 +1,8 @@
 package main
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"gallery0api/handlers"
+	"gallery0api/hash"
 	"gallery0api/middleware"
 	"gallery0api/models"
 	"log"
@@ -35,53 +34,50 @@ func main() {
 	defer db.Close()
 	db.LogMode(true) // dev only!
 
-	err = models.AutoMigrate(db)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// err = models.Reset(db)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	
+	hmac := hash.NewHMAC(os.Getenv("hmackey"))
+	gs := models.NewGalleryService(db)
+	ims := models.NewImageService(db)
+	us := models.NewUserService(db, hmac)
 
-	hmac := hmac.New(sha256.New, []byte(os.Getenv("Hmackey")))
+	gh := handlers.NewGalleryHandler(gs)
+	imh := handlers.NewImageHandler(gs, ims)
+	uh := handlers.NewUserHandler(us)
 
 	r := gin.Default()
 	config := cors.DefaultConfig()
 	config.AllowOrigins = []string{"http://localhost:3000"}
 	config.AllowHeaders = []string{"Authorization", "Origin", "Content-Type"}
+
 	r.Use(cors.New(config))
 
-	gg := models.NewGalleryGorm(db)
-	ug := models.NewUserGorm(db, hmac)
-	ig := models.NewImageGorm(db)
+	r.Static("/upload", "./upload")
 
-	gh := handlers.NewGalleryHandler(gg)
-	uh := handlers.NewUserHandler(ug)
-	ih := handlers.NewImageHandler(ig)
-
-	r.Static("/upload", "./Image")
-
-	r.POST("/signup", uh.CreateUser)
+	r.POST("/signup", uh.Signup)
 	r.POST("/login", uh.Login)
-	r.GET("/gallerys", gh.ListGallery)
+	r.GET("/galleries", gh.ListPublish)
 
-	mg := r.Group("")
-	mg.Use(middleware.RequireUser(ug, hmac))
+	auth := r.Group("/")
+	auth.Use(middleware.RequireUser(us))
 	{
+		auth.POST("/logout", uh.Logout)
+		user := auth.Group("/user")
+		{
+			user.POST("/galleries", gh.Create)
+			user.GET("/galleries", gh.List)
+			user.GET("/galleries/:id", gh.GetOne)
+			user.DELETE("/galleries/:id", gh.Delete)
+			user.PATCH("/galleries/:id/names", gh.UpdateName)
+			user.PATCH("/galleries/:id/publishes", gh.UpdatePublishing)
+			user.POST("/galleries/:id/images", imh.CreateImage)
+			user.GET("/galleries/:id/images", imh.ListGalleryImages)
+			user.DELETE("/images/:id", imh.DeleteImage)
+		}
 
-		mg.POST("/gallerys", gh.CreateGallery)
-		mg.PUT("/gallerys/:id", gh.UpdateGallery)
-		mg.DELETE("/gallerys/:id", gh.DeleteGallery)
-		mg.POST("/gallerys/:id/images", ih.CreateImage)
-		mg.GET("/gallerys/:id/images", ih.GetImagesByGalleryID)
-		mg.GET("/sessions", func(c *gin.Context) {
-			user, ok := c.Value("user").(*models.UserTable)
-			if !ok {
-				c.JSON(401, gin.H{
-					"message": "invalid token",
-				})
-				return
-			}
-			c.JSON(200, user)
-		})
 	}
-
-	r.Run()
+	r.Run(":8080")
 }

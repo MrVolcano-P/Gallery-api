@@ -6,8 +6,14 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func User(c *gin.Context) *models.UserTable {
-	user, ok := c.Value("user").(*models.UserTable)
+const key string = "user"
+
+func SetUser(c *gin.Context, user *models.User) {
+	c.Set(key, user)
+}
+
+func User(c *gin.Context) *models.User {
+	user, ok := c.Value(key).(*models.User)
 	if !ok {
 		return nil
 	}

@@ -1,86 +1,82 @@
 package handlers
 
 import (
+	"errors"
+	"gallery0api/context"
 	"gallery0api/models"
-	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 )
 
-type User struct {
-	ID    uint   `json:"id"`
-	Email string `json:"email"`
-	Name  string `json:"name"`
-}
-
 type UserHandler struct {
-	ug models.UserService
+	us models.UserService
 }
 
-func NewUserHandler(ug models.UserService) *UserHandler {
-	return &UserHandler{ug}
+func NewUserHandler(us models.UserService) *UserHandler {
+	return &UserHandler{us}
 }
 
-type NewUser struct {
-	Email    string
-	Password string
-	Name     string
+type SignupReq struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Name     string `json:"name"`
 }
 
-func (uh *UserHandler) CreateUser(c *gin.Context) {
-	cost := 10
-	user := &NewUser{}
-	if err := c.BindJSON(user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
-	}
-	userTable := &models.UserTable{}
-	userTable.Email = user.Email
-	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), cost)
-	if err != nil {
-		c.Status(500)
+func (uh *UserHandler) Signup(c *gin.Context) {
+	req := new(SignupReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
 		return
 	}
-	userTable.Password = string(hash)
-	userTable.Name = user.Name
-	if err := uh.ug.CreateUser(userTable); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+	user := new(models.User)
+	user.Email = req.Email
+	user.Password = req.Password
+	user.Name = req.Name
+	if err := uh.us.Create(user); err != nil {
+		Error(c, 500, err)
+		return
 	}
-	c.JSON(http.StatusCreated, User{
-		ID:    userTable.ID,
-		Name:  userTable.Name,
-		Email: userTable.Email,
+	c.JSON(201, gin.H{
+		"token": user.Token,
+		"email": user.Email,
+		"name":  user.Name,
 	})
 }
 
 type LoginReq struct {
-	Email    string
-	Password string
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }
 
 func (uh *UserHandler) Login(c *gin.Context) {
-	req := &LoginReq{}
+	req := new(LoginReq)
 	if err := c.BindJSON(req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
+		return
 	}
-	userTable := &models.UserTable{}
-	userTable.Email = req.Email
-	userTable.Password = req.Password
-	token, err := uh.ug.Login(userTable)
+	user := new(models.User)
+	user.Email = req.Email
+	user.Password = req.Password
+	token, err := uh.us.Login(user)
 	if err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 401, err)
+		return
 	}
-	userTable.Token = token
 	c.JSON(201, gin.H{
-		"token": userTable.Token,
+		"token": token,
 	})
+}
 
+func (uh *UserHandler) Logout(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		Error(c, 401, errors.New("invalid token"))
+		return
+	}
+	err := uh.us.Logout(user)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(204)
 }

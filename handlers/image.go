@@ -1,102 +1,114 @@
 package handlers
 
 import (
-	"fmt"
 	"gallery0api/models"
 	"net/http"
-	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Image struct {
-	ID       uint   `json:"id"`
-	Filename string `json:"filename"`
+type ImageRes struct {
+	ID        uint   `json:"id"`
+	GalleryID uint   `json:"gallery_id"`
+	Filename  string `json:"filename"`
+}
+
+type CreateImageRes struct {
+	ImageRes
 }
 
 type ImageHandler struct {
-	ig models.ImageService
+	gs  models.GalleryService
+	ims models.ImageService
 }
 
-func NewImageHandler(ig models.ImageService) *ImageHandler {
-	return &ImageHandler{ig}
+func NewImageHandler(gs models.GalleryService, ims models.ImageService) *ImageHandler {
+	return &ImageHandler{gs, ims}
 }
 
-type NewImage struct {
-	Filename  string
-	Width     uint
-	Height    uint
-	GalleryID uint
-}
-
-func (ih *ImageHandler) CreateImage(c *gin.Context) {
-	idString := c.Param("id")
-	id, err := strconv.Atoi(idString)
+func (imh *ImageHandler) CreateImage(c *gin.Context) {
+	galleryIDStr := c.Param("id")
+	galleryID, err := strconv.Atoi(galleryIDStr)
 	if err != nil {
-		c.JSON(500, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
 		return
 	}
-	err = os.MkdirAll("upload", os.ModePerm)
+
+	gallery, err := imh.gs.GetByID(uint(galleryID))
 	if err != nil {
-		c.JSON(500, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
 		return
 	}
+
 	form, err := c.MultipartForm()
 	if err != nil {
-		c.JSON(400, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
 		return
 	}
-	images := form.File["image"]
 
-	for _, image := range images {
-		filename := filepath.Join("image", image.Filename)
-		// fmt.Printf("%+v", filename)
-		if err := c.SaveUploadedFile(image, filename); err != nil {
-			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
-			return
-		}
-		imageTable := new(models.ImageTable)
-		imageTable.Filename = filename
-		imageTable.Width = 4
-		imageTable.Height = 3
-		imageTable.GalleryID = uint(id)
-		if err := ih.ig.CreateImage(imageTable); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"message": err.Error(),
-			})
-		}
-		c.JSON(http.StatusCreated, gin.H{
-			
-		})
+	images, err := imh.ims.CreateImages(form.File["photos"], gallery.ID)
+	if err != nil {
+		Error(c, 500, err)
+		return
 	}
+
+	res := []CreateImageRes{}
+	for _, img := range images {
+		r := CreateImageRes{}
+		r.ID = img.ID
+		r.GalleryID = gallery.ID
+		r.Filename = filepath.Join(models.UploadPath, galleryIDStr, img.Filename)
+		res = append(res, r)
+	}
+
+	c.JSON(201, res)
 }
 
-func (ih *ImageHandler) GetImagesByGalleryID(c *gin.Context) {
-	idString := c.Param("id")
-	id, err := strconv.Atoi(idString)
-	its, err := ih.ig.GetImagesByGalleryID(uint(id))
+func (imh *ImageHandler) DeleteImage(c *gin.Context) {
+	imageIDStr := c.Param("id")
+	id, err := strconv.Atoi(imageIDStr)
 	if err != nil {
-		c.JSON(500, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
 		return
 	}
-	fmt.Println(its)
-	// images := []Image{}
-	// for _, it := range its {
-	// 	images = append(images, Image{
-	// 		ID:  it.ID,
-	// 		Src: it.Src,
-	// 	})
-	// }
+	if err := imh.ims.Delete(uint(id)); err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(http.StatusOK)
+}
 
-	// c.JSON(http.StatusOK, images)
+type ListGalleryImagesRes struct {
+	ImageRes
+}
+
+func (imh *ImageHandler) ListGalleryImages(c *gin.Context) {
+	galleryIDStr := c.Param("id")
+	id, err := strconv.Atoi(galleryIDStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+
+	gallery, err := imh.gs.GetByID(uint(id))
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	images, err := imh.ims.GetByGalleryID(gallery.ID)
+	if err != nil {
+		Error(c, http.StatusNotFound, err)
+		return
+	}
+	res := []ListGalleryImagesRes{}
+	for _, img := range images {
+		r := ListGalleryImagesRes{}
+		r.ID = img.ID
+		r.GalleryID = gallery.ID
+		r.Filename = img.FilePath()
+		res = append(res, r)
+	}
+	c.JSON(http.StatusOK, res)
 }

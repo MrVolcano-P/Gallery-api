@@ -1,77 +1,105 @@
 package models
 
 import (
-	"encoding/base64"
 	"fmt"
+	"gallery0api/hash"
 	"gallery0api/rand"
-	"hash"
+	"log"
 
 	"github.com/jinzhu/gorm"
 	"golang.org/x/crypto/bcrypt"
 )
 
-type UserTable struct {
+const cost = 12
+
+type User struct {
 	gorm.Model
-	Email    string `gorm:"unique;not null"`
+	Email    string `gorm:"unique_index;not null"`
 	Password string `gorm:"not null"`
-	Name     string
-	Token    string `gorm:"unique"`
+	Name     string `gorm:"not null"`
+	Token    string `gorm:"index"`
 }
 
 type UserService interface {
-	CreateUser(user *UserTable) error
-	Login(user *UserTable) (string, error)
-	GetByToken(token string) (*UserTable, error)
+	Create(user *User) error
+	Login(user *User) (string, error)
+	GetByToken(token string) (*User, error)
+	Logout(user *User) error
 }
 
-var _ UserService = &UserGorm{}
+func NewUserService(db *gorm.DB, hmac *hash.HMAC) UserService {
+	return &userGorm{db, hmac}
+}
 
-type UserGorm struct {
+type userGorm struct {
 	db   *gorm.DB
-	hmac hash.Hash
+	hmac *hash.HMAC
 }
 
-func NewUserGorm(db *gorm.DB, hmac hash.Hash) UserService {
-	return &UserGorm{db, hmac}
-}
+func (ug *userGorm) Create(temp *User) error {
+	user := new(User)
+	user.Email = temp.Email
+	user.Password = temp.Password
+	user.Name = temp.Name
+	hash, err := bcrypt.GenerateFromPassword([]byte(user.Password), cost)
+	if err != nil {
+		return err
+	}
+	user.Password = string(hash)
+	token, err := rand.GetToken()
+	if err != nil {
+		return err
+	}
 
-func (ug *UserGorm) CreateUser(user *UserTable) error {
+	fmt.Println("token ===> ", token)
+	tokenHash := ug.hmac.Hash(token)
+	fmt.Println("tokenHashStr ===> ", tokenHash)
+
+	user.Token = tokenHash
+	temp.Token = token
+
 	return ug.db.Create(user).Error
 }
 
-var err error
-
-func (ug *UserGorm) Login(user *UserTable) (string, error) {
-	found := new(UserTable)
-	if err := ug.db.Where("email = ?", user.Email).First(&found).Error; err != nil {
+func (ug *userGorm) Login(user *User) (string, error) {
+	found := new(User)
+	err := ug.db.Where("email = ?", user.Email).First(&found).Error
+	if err != nil {
 		return "", err
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(found.Password), []byte(user.Password))
 	if err != nil {
-		return "", nil
+		return "", err
 	}
 	token, err := rand.GetToken()
 	if err != nil {
 		return "", err
 	}
-	fmt.Println("token", token)
-	ug.hmac.Write([]byte(token))
-	hash := ug.hmac.Sum(nil)
-	ug.hmac.Reset()
-	fmt.Println("hash", base64.URLEncoding.EncodeToString(hash))
-	encode := base64.URLEncoding.EncodeToString(hash)
-	err = ug.db.Model(&UserTable{}).
+
+	fmt.Println("token ===> ", token)
+	tokenHash := ug.hmac.Hash(token)
+	fmt.Println("tokenHashStr ===> ", tokenHash)
+
+	err = ug.db.Model(&User{}).
 		Where("id = ?", found.ID).
-		Update("token", encode).Error
+		Update("token", tokenHash).Error
 	if err != nil {
 		return "", err
 	}
 	return token, nil
 }
 
-func (ug *UserGorm) GetByToken(token string) (*UserTable, error) {
-	user := &UserTable{}
-	err := ug.db.Where("token = ?", token).First(&user).Error
+func (ug *userGorm) Logout(user *User) error {
+	return ug.db.Model(user).
+		Where("id = ?", user.ID).
+		Update("token", "").Error
+}
+
+func (ug *userGorm) GetByToken(token string) (*User, error) {
+	tokenHash := ug.hmac.Hash(token)
+	log.Println("lookup for user by token(hashed): ", tokenHash)
+	user := new(User)
+	err := ug.db.Where("token = ?", tokenHash).First(user).Error
 	if err != nil {
 		return nil, err
 	}

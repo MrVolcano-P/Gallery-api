@@ -9,8 +9,8 @@ import (
 // Reset will drop and re-create table
 func Reset(db *gorm.DB) error {
 	err := db.DropTableIfExists(
-		&GalleryTable{},
-		&ImageTable{},
+		&Gallery{},
+		&Image{},
 	).Error
 	if err != nil {
 		log.Println(err)
@@ -23,8 +23,8 @@ func Reset(db *gorm.DB) error {
 // AutoMigrate will create or update table
 func AutoMigrate(db *gorm.DB) error {
 	return db.AutoMigrate(
-		&GalleryTable{},
-		&ImageTable{},
-		&UserTable{},
+		&Gallery{},
+		&Image{},
+		&User{},
 	).Error
 }

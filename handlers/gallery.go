@@ -1,118 +1,182 @@
 package handlers
 
 import (
-	"fmt"
+	"gallery0api/context"
 	"gallery0api/models"
-	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type Gallery struct {
-	ID   uint   `json:"id"`
+type GalleryHandler struct {
+	gs models.GalleryService
+}
+
+func NewGalleryHandler(gs models.GalleryService) *GalleryHandler {
+	return &GalleryHandler{gs}
+}
+
+type GalleryRes struct {
+	ID        uint   `json:"id"`
+	Name      string `json:"name"`
+	IsPublish bool   `json:"is_publish"`
+}
+
+type CreateReq struct {
 	Name string `json:"name"`
 }
 
-type GalleryHandler struct {
-	gg models.GalleryService
+type CreateRes struct {
+	GalleryRes
 }
 
-func NewGalleryHandler(gg models.GalleryService) *GalleryHandler {
-	return &GalleryHandler{gg}
-}
-
-func (gh *GalleryHandler) ListGallery(c *gin.Context) {
-	tts, err := gh.gg.ListGallery()
-	if err != nil {
-		c.JSON(500, gin.H{
-			"message": err.Error(),
-		})
+func (gh *GalleryHandler) Create(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		c.Status(401)
 		return
 	}
-
-	gallerys := []Gallery{}
-	for _, tt := range tts {
-		gallerys = append(gallerys, Gallery{
-			ID:   tt.ID,
-			Name: tt.Name,
-		})
+	req := new(CreateReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
+		return
 	}
-
-	c.JSON(http.StatusOK, gallerys)
+	gallery := new(models.Gallery)
+	gallery.Name = req.Name
+	gallery.UserID = user.ID
+	if err := gh.gs.Create(gallery); err != nil {
+		Error(c, 500, err)
+		return
+	}
+	res := new(CreateRes)
+	res.ID = gallery.ID
+	res.Name = gallery.Name
+	res.IsPublish = gallery.IsPublish
+	c.JSON(201, res)
 }
 
-type NewGallery struct {
-	Name string
+func (gh *GalleryHandler) ListPublish(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		c.Status(401)
+		return
+	}
+	data, err := gh.gs.ListAllPublish()
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	galleries := []GalleryRes{}
+	for _, d := range data {
+		galleries = append(galleries, GalleryRes{
+			ID:        d.ID,
+			Name:      d.Name,
+			IsPublish: d.IsPublish,
+		})
+	}
+	c.JSON(200, galleries)
 }
 
-func (gh *GalleryHandler) CreateGallery(c *gin.Context) {
-	
+func (gh *GalleryHandler) List(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		c.Status(401)
+		return
+	}
+	data, err := gh.gs.ListByUserID(user.ID)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	galleries := []GalleryRes{}
+	for _, d := range data {
+		galleries = append(galleries, GalleryRes{
+			ID:        d.ID,
+			Name:      d.Name,
+			IsPublish: d.IsPublish,
+		})
+	}
+	c.JSON(200, galleries)
+}
 
-	data := new(NewGallery)
-	if err := c.BindJSON(data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+func (gh *GalleryHandler) GetOne(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
 	}
-	GalleryTable := new(models.GalleryTable)
-	GalleryTable.Name = data.Name
-	if err := gh.gg.CreateGallery(GalleryTable); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+	data, err := gh.gs.GetByID(uint(id))
+	if err != nil {
+		Error(c, 500, err)
+		return
 	}
-	c.JSON(http.StatusCreated, Gallery{
-		ID:   GalleryTable.ID,
-		Name: GalleryTable.Name,
+	c.JSON(200, GalleryRes{
+		ID:        data.ID,
+		Name:      data.Name,
+		IsPublish: data.IsPublish,
 	})
 }
 
-type UpdateGallery struct {
-	Name string
+func (gh *GalleryHandler) Delete(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	err = gh.gs.DeleteGallery(uint(id))
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(204)
 }
 
-func (gh *GalleryHandler) UpdateGallery(c *gin.Context) {
-	idString := c.Param("id")
-	fmt.Println(idString)
-	idUint, err := strconv.ParseUint(idString, 10, 64)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-	}
-	update := new(UpdateGallery)
-	if err := c.BindJSON(update); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
-	}
-	GalleryTable := new(models.GalleryTable)
-	GalleryTable.Name = update.Name
-	if err := gh.gg.UpdateGallery(idUint, GalleryTable); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
-	}
-	c.JSON(http.StatusOK, Gallery{
-		ID:   GalleryTable.ID,
-		Name: GalleryTable.Name,
-	})
-
+type UpdateNameReq struct {
+	Name string `json:"name"`
 }
-func (gh *GalleryHandler) DeleteGallery(c *gin.Context) {
-	idString := c.Param("id")
-	// idUint, err := strconv.ParseUint(idString, 10, 64)
-	id, err := strconv.Atoi(idString)
+
+func (gh *GalleryHandler) UpdateName(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"message": err.Error(),
-		})
+		Error(c, 400, err)
+		return
 	}
-	if err := gh.gg.DeleteGallery(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"message": err.Error(),
-		})
+	req := new(UpdateNameReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
+		return
 	}
-	c.Status(http.StatusNoContent)
+	err = gh.gs.UpdateGalleryName(uint(id), req.Name)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(204)
+}
+
+type UpdateStatusReq struct {
+	IsPublish bool `json:"is_publish"`
+}
+
+func (gh *GalleryHandler) UpdatePublishing(c *gin.Context) {
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	req := new(UpdateStatusReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
+		return
+	}
+	err = gh.gs.UpdateGalleryPublishing(uint(id), req.IsPublish)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(204)
 }
