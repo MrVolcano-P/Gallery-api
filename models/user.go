@@ -1,8 +1,6 @@
 package models
 
 import (
-	"crypto/hmac"
-	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"gallery0api/rand"
@@ -33,11 +31,8 @@ type UserGorm struct {
 	hmac hash.Hash
 }
 
-const hmackey = "secret"
-
-func NewUserGorm(db *gorm.DB) UserService {
-	mac := hmac.New(sha256.New, []byte(hmackey))
-	return &UserGorm{db, mac}
+func NewUserGorm(db *gorm.DB, hmac hash.Hash) UserService {
+	return &UserGorm{db, hmac}
 }
 
 func (ug *UserGorm) CreateUser(user *UserTable) error {

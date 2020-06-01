@@ -1,29 +1,16 @@
 package middleware
 
 import (
+	"encoding/base64"
+	"fmt"
 	"gallery0api/models"
+	"hash"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
-// func Auth(c *gin.Context) {
-// 	header := c.GetHeader("Authorization")
-// 	checkToken := strings.Split(header, " ")
-// 	if len(checkToken) <= 1 {
-// 		c.JSON(401, gin.H{
-// 			"message": "no token",
-// 		})
-// 		c.Abort()
-// 		return
-// 	}
-// 	fmt.Println("kkkkkkkkk: ")
-// 	token := header[8:]
-// 	fmt.Println("token123: ", token)
-// 	c.Set("token", token)
-
-// }
-func RequireUser(us models.UserService) gin.HandlerFunc {
+func RequireUser(us models.UserService, hmac hash.Hash) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := GetToken(c)
 		if token == "" {
@@ -31,7 +18,12 @@ func RequireUser(us models.UserService) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		user, err := us.GetByToken(token)
+		hmac.Write([]byte(token))
+		hash := hmac.Sum(nil)
+		hmac.Reset()
+		fmt.Println("hash", base64.URLEncoding.EncodeToString(hash))
+		encode := base64.URLEncoding.EncodeToString(hash)
+		user, err := us.GetByToken(encode)
 		if err != nil {
 			c.Status(401)
 			c.Abort()

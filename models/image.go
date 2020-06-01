@@ -6,10 +6,10 @@ import (
 
 type ImageTable struct {
 	gorm.Model
-	Src       string
+	Filename  string `gorm:"not null"`
 	Width     uint
 	Height    uint
-	GalleryID uint
+	GalleryID uint `gorm:"not null"`
 }
 
 type ImageService interface {

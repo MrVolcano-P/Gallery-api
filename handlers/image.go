@@ -4,14 +4,16 @@ import (
 	"fmt"
 	"gallery0api/models"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
 type Image struct {
-	ID  uint   `json:"id"`
-	Src string `json:"src"`
+	ID       uint   `json:"id"`
+	Filename string `json:"filename"`
 }
 
 type ImageHandler struct {
@@ -23,18 +25,13 @@ func NewImageHandler(ig models.ImageService) *ImageHandler {
 }
 
 type NewImage struct {
-	Src       string
+	Filename  string
 	Width     uint
 	Height    uint
 	GalleryID uint
 }
 
 func (ih *ImageHandler) CreateImage(c *gin.Context) {
-	getToken, isToken := c.Get("token")
-	if !isToken {
-		fmt.Println("err")
-	}
-	fmt.Println(getToken)
 	idString := c.Param("id")
 	id, err := strconv.Atoi(idString)
 	if err != nil {
@@ -43,26 +40,43 @@ func (ih *ImageHandler) CreateImage(c *gin.Context) {
 		})
 		return
 	}
-	data := new(NewImage)
-	if err := c.BindJSON(data); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
+	err = os.MkdirAll("upload", os.ModePerm)
+	if err != nil {
+		c.JSON(500, gin.H{
 			"message": err.Error(),
 		})
+		return
 	}
-	imageTable := new(models.ImageTable)
-	imageTable.Src = data.Src
-	imageTable.Width = data.Width
-	imageTable.Height = data.Height
-	imageTable.GalleryID = uint(id)
-	if err := ih.ig.CreateImage(imageTable); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
+	form, err := c.MultipartForm()
+	if err != nil {
+		c.JSON(400, gin.H{
 			"message": err.Error(),
 		})
+		return
 	}
-	c.JSON(http.StatusCreated, Image{
-		ID:  imageTable.ID,
-		Src: imageTable.Src,
-	})
+	images := form.File["image"]
+
+	for _, image := range images {
+		filename := filepath.Join("image", image.Filename)
+		// fmt.Printf("%+v", filename)
+		if err := c.SaveUploadedFile(image, filename); err != nil {
+			c.String(http.StatusBadRequest, fmt.Sprintf("upload file err: %s", err.Error()))
+			return
+		}
+		imageTable := new(models.ImageTable)
+		imageTable.Filename = filename
+		imageTable.Width = 4
+		imageTable.Height = 3
+		imageTable.GalleryID = uint(id)
+		if err := ih.ig.CreateImage(imageTable); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"message": err.Error(),
+			})
+		}
+		c.JSON(http.StatusCreated, gin.H{
+			
+		})
+	}
 }
 
 func (ih *ImageHandler) GetImagesByGalleryID(c *gin.Context) {
