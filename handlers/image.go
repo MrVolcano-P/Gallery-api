@@ -1,9 +1,10 @@
 package handlers
 
 import (
+	"fmt"
 	"gallery0api/models"
 	"net/http"
-	"path/filepath"
+	"path"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -19,16 +20,16 @@ type CreateImageRes struct {
 	ImageRes
 }
 
-type ImageHandler struct {
-	gs  models.GalleryService
-	ims models.ImageService
-}
+// type Handler struct {
+// 	gs  models.GalleryService
+// 	ims models.ImageService
+// }
 
-func NewImageHandler(gs models.GalleryService, ims models.ImageService) *ImageHandler {
-	return &ImageHandler{gs, ims}
-}
+// func NewHandler(gs models.GalleryService, ims models.ImageService) *Handler {
+// 	return &Handler{gs, ims}
+// }
 
-func (imh *ImageHandler) CreateImage(c *gin.Context) {
+func (h *Handler) CreateImage(c *gin.Context) {
 	galleryIDStr := c.Param("id")
 	galleryID, err := strconv.Atoi(galleryIDStr)
 	if err != nil {
@@ -36,7 +37,7 @@ func (imh *ImageHandler) CreateImage(c *gin.Context) {
 		return
 	}
 
-	gallery, err := imh.gs.GetByID(uint(galleryID))
+	gallery, err := h.gs.GetByID(uint(galleryID))
 	if err != nil {
 		Error(c, 400, err)
 		return
@@ -48,7 +49,7 @@ func (imh *ImageHandler) CreateImage(c *gin.Context) {
 		return
 	}
 
-	images, err := imh.ims.CreateImages(form.File["photos"], gallery.ID)
+	images, err := h.ims.CreateImages(form.File["photos"], gallery.ID)
 	if err != nil {
 		Error(c, 500, err)
 		return
@@ -59,32 +60,32 @@ func (imh *ImageHandler) CreateImage(c *gin.Context) {
 		r := CreateImageRes{}
 		r.ID = img.ID
 		r.GalleryID = gallery.ID
-		r.Filename = filepath.Join(models.UploadPath, galleryIDStr, img.Filename)
+		r.Filename = path.Join(models.UploadPath, galleryIDStr, img.Filename)
 		res = append(res, r)
 	}
 
 	c.JSON(201, res)
 }
 
-func (imh *ImageHandler) DeleteImage(c *gin.Context) {
-	imageIDStr := c.Param("id")
-	id, err := strconv.Atoi(imageIDStr)
-	if err != nil {
-		Error(c, 400, err)
-		return
-	}
-	if err := imh.ims.Delete(uint(id)); err != nil {
-		Error(c, 500, err)
-		return
-	}
-	c.Status(http.StatusOK)
-}
+// func (h *Handler) DeleteImage(c *gin.Context) {
+// 	imageIDStr := c.Param("id")
+// 	id, err := strconv.Atoi(imageIDStr)
+// 	if err != nil {
+// 		Error(c, 400, err)
+// 		return
+// 	}
+// 	if err := h.ims.Delete(uint(id)); err != nil {
+// 		Error(c, 500, err)
+// 		return
+// 	}
+// 	c.Status(http.StatusOK)
+// }
 
 type ListGalleryImagesRes struct {
 	ImageRes
 }
 
-func (imh *ImageHandler) ListGalleryImages(c *gin.Context) {
+func (h *Handler) ListGalleryImages(c *gin.Context) {
 	galleryIDStr := c.Param("id")
 	id, err := strconv.Atoi(galleryIDStr)
 	if err != nil {
@@ -92,12 +93,12 @@ func (imh *ImageHandler) ListGalleryImages(c *gin.Context) {
 		return
 	}
 
-	gallery, err := imh.gs.GetByID(uint(id))
+	gallery, err := h.gs.GetByID(uint(id))
 	if err != nil {
 		Error(c, 400, err)
 		return
 	}
-	images, err := imh.ims.GetByGalleryID(gallery.ID)
+	images, err := h.ims.GetByGalleryID(gallery.ID)
 	if err != nil {
 		Error(c, http.StatusNotFound, err)
 		return
@@ -111,4 +112,35 @@ func (imh *ImageHandler) ListGalleryImages(c *gin.Context) {
 		res = append(res, r)
 	}
 	c.JSON(http.StatusOK, res)
+}
+
+type DeleteReq struct {
+	FileNames []string `json:"filenames"`
+}
+
+func (h *Handler) DeleteImageInGallary(c *gin.Context) {
+	galleryIDStr := c.Param("id")
+	id, err := strconv.Atoi(galleryIDStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	req := new(DeleteReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
+		return
+	}
+	// fmt.Println(req)
+	for _, r := range req.FileNames {
+		fmt.Println(r)
+		err = h.ims.RemoveImageByFileName(uint(id), r)
+		if err != nil {
+			Error(c, 500, err)
+			return
+		}
+	}
+
+	// filename := c.Param("filename")
+
+	c.Status(204)
 }

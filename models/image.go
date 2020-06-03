@@ -6,6 +6,7 @@ import (
 	"log"
 	"mime/multipart"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 
@@ -23,13 +24,14 @@ type Image struct {
 
 func (img *Image) FilePath() string {
 	idStr := strconv.FormatUint(uint64(img.GalleryID), 10)
-	return filepath.Join(UploadPath, idStr, img.Filename)
+	return path.Join(UploadPath, idStr, img.Filename)
 }
 
 type ImageService interface {
 	CreateImages(images []*multipart.FileHeader, galleryID uint) ([]Image, error)
-	Delete(id uint) error
+	// Delete(id uint) error
 	GetByGalleryID(id uint) ([]Image, error)
+	RemoveImageByFileName(galleryID uint, path string) error
 }
 
 type imageService struct {
@@ -42,7 +44,7 @@ func NewImageService(db *gorm.DB) ImageService {
 
 func (ims *imageService) CreateImages(files []*multipart.FileHeader, galleryID uint) ([]Image, error) {
 	idStr := strconv.FormatUint(uint64(galleryID), 10)
-	dir := filepath.Join(UploadPath, idStr)
+	dir := path.Join(UploadPath, idStr)
 	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
 		log.Printf("create gallery dir error: %v\n", err)
 		return nil, err
@@ -117,17 +119,17 @@ func saveFile(file *multipart.FileHeader, dst string) error {
 	return err
 }
 
-func (ims *imageService) Delete(id uint) error {
-	image, err := ims.GetByID(id)
-	if err != nil {
-		return err
-	}
-	err = os.Remove(image.FilePath())
-	if err != nil {
-		log.Printf("Fail deleting image: %v\n", err)
-	}
-	return ims.db.Where("id = ?", id).Delete(&Image{}).Error
-}
+// func (ims *imageService) Delete(id uint) error {
+// 	image, err := ims.GetByID(id)
+// 	if err != nil {
+// 		return err
+// 	}
+// 	err = os.Remove(image.FilePath())
+// 	if err != nil {
+// 		log.Printf("Fail deleting image: %v\n", err)
+// 	}
+// 	return ims.db.Where("id = ?", id).Delete(&Image{}).Error
+// }
 
 // GetByID will return image of a given ID
 func (ims *imageService) GetByID(id uint) (*Image, error) {
@@ -149,4 +151,23 @@ func (ims *imageService) GetByGalleryID(id uint) ([]Image, error) {
 		return nil, err
 	}
 	return images, nil
+}
+
+func (ims *imageService) RemoveImageByFileName(galleryID uint, filename string) error {
+	image := new(Image)
+	idStr := strconv.FormatUint(uint64(galleryID), 10)
+	err := ims.db.Where("filename = ?", filename).Delete(image).Error
+	if err != nil {
+		log.Printf("Can't delete", err)
+		return err
+	}
+	err = os.Remove(path.Join("upload", idStr, filename))
+	// fmt.Println(filePath)
+	// ใช้ os.RemoveAll("dirname")
+	// ถ้าเราอยาก delete ทั้ง directory
+	if err != nil {
+		log.Printf("Can't find path", err)
+		return err
+	}
+	return err
 }

@@ -44,9 +44,10 @@ func main() {
 	ims := models.NewImageService(db)
 	us := models.NewUserService(db, hmac)
 
-	gh := handlers.NewGalleryHandler(gs)
-	imh := handlers.NewImageHandler(gs, ims)
-	uh := handlers.NewUserHandler(us)
+	// gh := handlers.NewGalleryHandler(gs)
+	// imh := handlers.NewImageHandler(gs, ims)
+	// uh := handlers.NewUserHandler(us)
+	h := handlers.NewHandler(gs, us, ims)
 
 	r := gin.Default()
 	config := cors.DefaultConfig()
@@ -57,27 +58,27 @@ func main() {
 
 	r.Static("/upload", "./upload")
 
-	r.POST("/signup", uh.Signup)
-	r.POST("/login", uh.Login)
-	r.GET("/galleries", gh.ListPublish)
-
+	r.POST("/signup", h.Signup)
+	r.POST("/login", h.Login)
+	r.GET("/galleries", h.ListPublish)
+	r.GET("/galleries/:id", h.GetOne)
+	r.GET("/galleries/:id/images", h.ListGalleryImages)
 	auth := r.Group("/")
 	auth.Use(middleware.RequireUser(us))
 	{
-		auth.POST("/logout", uh.Logout)
+		auth.POST("/logout", h.Logout)
 		user := auth.Group("/user")
 		{
-			user.POST("/galleries", gh.Create)
-			user.GET("/galleries", gh.List)
-			user.GET("/galleries/:id", gh.GetOne)
-			user.DELETE("/galleries/:id", gh.Delete)
-			user.PATCH("/galleries/:id/names", gh.UpdateName)
-			user.PATCH("/galleries/:id/publishes", gh.UpdatePublishing)
-			user.POST("/galleries/:id/images", imh.CreateImage)
-			user.GET("/galleries/:id/images", imh.ListGalleryImages)
-			user.DELETE("/images/:id", imh.DeleteImage)
+			user.POST("/galleries", h.Create)
+			user.GET("/galleries", h.List)
+			user.DELETE("/galleries/:id", h.Delete)
+			user.PATCH("/galleries/:id/names", h.UpdateName)
+			user.PATCH("/galleries/:id/publishes", h.UpdatePublishing)
+			user.POST("/galleries/:id/images", h.CreateImage)
+			// user.DELETE("/images/:id", h.DeleteImage)
+			user.DELETE("/galleries/:id/images", h.DeleteImageInGallary)
+			user.GET("/profile", h.GetProfile)
 		}
-
 	}
 	r.Run(":8080")
 }

@@ -2,27 +2,25 @@ package handlers
 
 import (
 	"errors"
+	"fmt"
 	"gallery0api/context"
 	"gallery0api/models"
 
 	"github.com/gin-gonic/gin"
 )
 
-type UserHandler struct {
-	us models.UserService
+type User struct {
+	ID    uint   `json:"id"`
+	Email string `json:"email"`
+	Name  string `json:"name"`
 }
-
-func NewUserHandler(us models.UserService) *UserHandler {
-	return &UserHandler{us}
-}
-
 type SignupReq struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 	Name     string `json:"name"`
 }
 
-func (uh *UserHandler) Signup(c *gin.Context) {
+func (h *Handler) Signup(c *gin.Context) {
 	req := new(SignupReq)
 	if err := c.BindJSON(req); err != nil {
 		Error(c, 400, err)
@@ -32,7 +30,7 @@ func (uh *UserHandler) Signup(c *gin.Context) {
 	user.Email = req.Email
 	user.Password = req.Password
 	user.Name = req.Name
-	if err := uh.us.Create(user); err != nil {
+	if err := h.us.Create(user); err != nil {
 		Error(c, 500, err)
 		return
 	}
@@ -48,7 +46,7 @@ type LoginReq struct {
 	Password string `json:"password"`
 }
 
-func (uh *UserHandler) Login(c *gin.Context) {
+func (h *Handler) Login(c *gin.Context) {
 	req := new(LoginReq)
 	if err := c.BindJSON(req); err != nil {
 		Error(c, 400, err)
@@ -57,7 +55,7 @@ func (uh *UserHandler) Login(c *gin.Context) {
 	user := new(models.User)
 	user.Email = req.Email
 	user.Password = req.Password
-	token, err := uh.us.Login(user)
+	token, err := h.us.Login(user)
 	if err != nil {
 		Error(c, 401, err)
 		return
@@ -67,16 +65,30 @@ func (uh *UserHandler) Login(c *gin.Context) {
 	})
 }
 
-func (uh *UserHandler) Logout(c *gin.Context) {
+func (h *Handler) Logout(c *gin.Context) {
 	user := context.User(c)
 	if user == nil {
 		Error(c, 401, errors.New("invalid token"))
 		return
 	}
-	err := uh.us.Logout(user)
+	err := h.us.Logout(user)
 	if err != nil {
 		Error(c, 500, err)
 		return
 	}
 	c.Status(204)
+}
+
+func (h *Handler) GetProfile(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		Error(c, 401, errors.New("invalid token"))
+		return
+	}
+	fmt.Println(user)
+	c.JSON(200, gin.H{
+		"id":user.ID,
+		"email":user.Email,
+		"name":user.Name,
+	})
 }
