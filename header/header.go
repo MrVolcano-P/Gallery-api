@@ -1,14 +1,16 @@
 package header
 
 import (
-	"strings"
+	"fmt"
+	// "strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 func GetToken(c *gin.Context) string {
 	header := c.GetHeader("Authorization")
-	header = strings.TrimSpace(header)
+	// header = strings.TrimSpace(header)
+	fmt.Println(header)
 	min := len("Bearer ")
 	if len(header) <= min {
 		return ""

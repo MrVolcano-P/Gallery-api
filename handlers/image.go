@@ -14,6 +14,8 @@ type ImageRes struct {
 	ID        uint   `json:"id"`
 	GalleryID uint   `json:"gallery_id"`
 	Filename  string `json:"filename"`
+	Width     uint   `json:"width"`
+	Height    uint   `json:"height"`
 }
 
 type CreateImageRes struct {
@@ -130,7 +132,7 @@ func (h *Handler) DeleteImageInGallary(c *gin.Context) {
 		Error(c, 400, err)
 		return
 	}
-	// fmt.Println(req)
+	fmt.Println(req)
 	for _, r := range req.FileNames {
 		fmt.Println(r)
 		err = h.ims.RemoveImageByFileName(uint(id), r)

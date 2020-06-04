@@ -71,6 +71,7 @@ func main() {
 		{
 			user.POST("/galleries", h.Create)
 			user.GET("/galleries", h.List)
+			user.GET("/galleries/:id", h.GetOneAndCheck)
 			user.DELETE("/galleries/:id", h.Delete)
 			user.PATCH("/galleries/:id/names", h.UpdateName)
 			user.PATCH("/galleries/:id/publishes", h.UpdatePublishing)

@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"fmt"
 	"gallery0api/context"
 	"gallery0api/models"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -17,10 +19,12 @@ import (
 // }
 
 type GalleryRes struct {
-	ID        uint   `json:"id"`
-	Name      string `json:"name"`
-	IsPublish bool   `json:"is_publish"`
-	Owner     User   `json:"owner"`
+	ID        uint      `json:"id"`
+	Name      string    `json:"name"`
+	IsPublish bool      `json:"is_publish"`
+	Owner     User      `json:"owner"`
+	CreateAt  time.Time `json:"createAt"`
+	UpdateAt  time.Time `json:"updateAt"`
 }
 
 type CreateReq struct {
@@ -78,6 +82,8 @@ func (h *Handler) ListPublish(c *gin.Context) {
 			ID:        d.ID,
 			Name:      d.Name,
 			IsPublish: d.IsPublish,
+			CreateAt:  d.CreatedAt,
+			UpdateAt:  d.UpdatedAt,
 			Owner: User{
 				ID:    user.ID,
 				Email: user.Email,
@@ -110,6 +116,8 @@ func (h *Handler) List(c *gin.Context) {
 			ID:        d.ID,
 			Name:      d.Name,
 			IsPublish: d.IsPublish,
+			CreateAt:  d.CreatedAt,
+			UpdateAt:  d.UpdatedAt,
 			Owner: User{
 				ID:    user.ID,
 				Email: user.Email,
@@ -137,18 +145,63 @@ func (h *Handler) GetOne(c *gin.Context) {
 		Error(c, 500, err)
 		return
 	}
-	c.JSON(200, GalleryRes{
-		ID:        data.ID,
-		Name:      data.Name,
-		IsPublish: data.IsPublish,
-		Owner: User{
-			ID:    user.ID,
-			Email: user.Email,
-			Name:  user.Name,
-		},
-	})
+	if data.IsPublish == true {
+		fmt.Println("true")
+		c.JSON(200, GalleryRes{
+			ID:        data.ID,
+			Name:      data.Name,
+			IsPublish: data.IsPublish,
+			CreateAt:  data.CreatedAt,
+			UpdateAt:  data.UpdatedAt,
+			Owner: User{
+				ID:    user.ID,
+				Email: user.Email,
+				Name:  user.Name,
+			},
+		})
+	} else {
+		fmt.Println("false")
+		c.Status(401)
+	}
 }
-
+func (h *Handler) GetOneAndCheck(c *gin.Context) {
+	userContext := context.User(c)
+	if userContext == nil {
+		c.Status(401)
+		return
+	}
+	idStr := c.Param("id")
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	data, err := h.gs.GetByID(uint(id))
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	if data.UserID != userContext.ID {
+		c.JSON(401, gin.H{
+			"status":  false,
+			"message": "not owner",
+		})
+		return
+	} else {
+		c.JSON(200, GalleryRes{
+			ID:        data.ID,
+			Name:      data.Name,
+			IsPublish: data.IsPublish,
+			CreateAt:  data.CreatedAt,
+			UpdateAt:  data.UpdatedAt,
+			Owner: User{
+				ID:    userContext.ID,
+				Email: userContext.Email,
+				Name:  userContext.Name,
+			},
+		})
+	}
+}
 func (h *Handler) Delete(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.Atoi(idStr)
