@@ -7,14 +7,12 @@ import (
 	"gallery0api/middleware"
 	"gallery0api/models"
 	"log"
-	"os"
 	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/jinzhu/gorm"
 	_ "github.com/jinzhu/gorm/dialects/mysql"
-	"github.com/joho/godotenv"
 )
 
 type CreateGallery struct {
