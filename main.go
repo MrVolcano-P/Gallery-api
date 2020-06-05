@@ -23,14 +23,8 @@ type CreateGallery struct {
 
 func main() {
 	conf := config.Load()
-	err := godotenv.Load()
-	if err != nil {
-		log.Fatal("Error loading .env file")
-	}
-	db, err := gorm.Open(
-		"mysql",
-		"root:password@tcp(poomdv.c52jeww5mzql.ap-southeast-1.rds.amazonaws.com:3306)/gallery?parseTime=true",
-	)
+
+	db, err := gorm.Open("mysql", conf.Connection)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -40,12 +34,12 @@ func main() {
 		db.LogMode(true) // dev only!
 	}
 
-	// err = models.Reset(db)
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	err = models.AutoMigrate(db)
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	hmac := hash.NewHMAC(os.Getenv("hmackey"))
+	hmac := hash.NewHMAC(conf.HMACKey)
 	gs := models.NewGalleryService(db)
 	ims := models.NewImageService(db)
 	us := models.NewUserService(db, hmac)
