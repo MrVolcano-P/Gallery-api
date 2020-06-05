@@ -6,6 +6,6 @@ COPY . /app
 
 RUN go build -o api
 
-EXPOSE 8081
+EXPOSE 8080
 
 ENTRYPOINT [ "./api" ]
