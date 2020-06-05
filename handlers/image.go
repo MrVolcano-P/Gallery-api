@@ -69,20 +69,6 @@ func (h *Handler) CreateImage(c *gin.Context) {
 	c.JSON(201, res)
 }
 
-// func (h *Handler) DeleteImage(c *gin.Context) {
-// 	imageIDStr := c.Param("id")
-// 	id, err := strconv.Atoi(imageIDStr)
-// 	if err != nil {
-// 		Error(c, 400, err)
-// 		return
-// 	}
-// 	if err := h.ims.Delete(uint(id)); err != nil {
-// 		Error(c, 500, err)
-// 		return
-// 	}
-// 	c.Status(http.StatusOK)
-// }
-
 type ListGalleryImagesRes struct {
 	ImageRes
 }
@@ -141,8 +127,25 @@ func (h *Handler) DeleteImageInGallary(c *gin.Context) {
 			return
 		}
 	}
-
-	// filename := c.Param("filename")
-
 	c.Status(204)
+}
+
+func (h *Handler) DeleteImage(c *gin.Context) {
+	imageIDStr := c.Param("id")
+	filename := c.Param("filename")
+	id, err := strconv.Atoi(imageIDStr)
+	if err != nil {
+		Error(c, 400, err)
+		return
+	}
+	err = h.ims.RemoveImageByFileName(uint(id), filename)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.Status(200)
+	// if err := h.ims.Delete(uint(id)); err != nil {
+	// 	Error(c, 500, err)
+	// 	return
+	// }
 }

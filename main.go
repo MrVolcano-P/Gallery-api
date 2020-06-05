@@ -1,12 +1,14 @@
 package main
 
 import (
+	"gallery0api/config"
 	"gallery0api/handlers"
 	"gallery0api/hash"
 	"gallery0api/middleware"
 	"gallery0api/models"
 	"log"
 	"os"
+	"time"
 
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -20,6 +22,7 @@ type CreateGallery struct {
 }
 
 func main() {
+	conf := config.Load()
 	err := godotenv.Load()
 	if err != nil {
 		log.Fatal("Error loading .env file")
@@ -32,7 +35,10 @@ func main() {
 		log.Fatal(err)
 	}
 	defer db.Close()
-	db.LogMode(true) // dev only!
+
+	if conf.Mode == "dev" {
+		db.LogMode(true) // dev only!
+	}
 
 	// err = models.Reset(db)
 	// if err != nil {
@@ -50,11 +56,18 @@ func main() {
 	h := handlers.NewHandler(gs, us, ims)
 
 	r := gin.Default()
-	config := cors.DefaultConfig()
-	config.AllowOrigins = []string{"http://localhost:3000"}
-	config.AllowHeaders = []string{"Authorization", "Origin", "Content-Type"}
 
-	r.Use(cors.New(config))
+	r.Use(cors.New(cors.Config{
+		AllowAllOrigins:  true,
+		AllowMethods:     []string{"GET", "PUT", "PATCH", "POST", "DELETE", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Content-Length", "Content-Type", "Authorization"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
+	if conf.Mode != "dev" {
+		gin.SetMode(gin.ReleaseMode)
+	}
 
 	r.Static("/upload", "./upload")
 
@@ -76,9 +89,10 @@ func main() {
 			user.PATCH("/galleries/:id/names", h.UpdateName)
 			user.PATCH("/galleries/:id/publishes", h.UpdatePublishing)
 			user.POST("/galleries/:id/images", h.CreateImage)
-			// user.DELETE("/images/:id", h.DeleteImage)
+			user.DELETE("/galleries/:id/images/:filename", h.DeleteImage)
 			user.DELETE("/galleries/:id/images", h.DeleteImageInGallary)
 			user.GET("/profile", h.GetProfile)
+			user.POST("/profile", h.UpdateProfile)
 		}
 	}
 	r.Run(":8080")

@@ -26,6 +26,7 @@ type UserService interface {
 	GetByToken(token string) (*User, error)
 	Logout(user *User) error
 	GetByID(id uint) (*User, error)
+	UpdateProfile(id uint, name string) error
 }
 
 func NewUserService(db *gorm.DB, hmac *hash.HMAC) UserService {
@@ -113,4 +114,8 @@ func (ug *userGorm) GetByID(id uint) (*User, error) {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (ug *userGorm) UpdateProfile(id uint, name string) error {
+	return ug.db.Model(&User{}).Where("id = ?", id).Update("name", name).Error
 }

@@ -87,8 +87,40 @@ func (h *Handler) GetProfile(c *gin.Context) {
 	}
 	fmt.Println(user)
 	c.JSON(200, gin.H{
-		"id":user.ID,
-		"email":user.Email,
-		"name":user.Name,
+		"id":    user.ID,
+		"email": user.Email,
+		"name":  user.Name,
+	})
+}
+
+type UpdateProfileReq struct {
+	Name string `json:"name"`
+}
+
+func (h *Handler) UpdateProfile(c *gin.Context) {
+	user := context.User(c)
+	if user == nil {
+		Error(c, 401, errors.New("invalid token"))
+		return
+	}
+	req := new(UpdateProfileReq)
+	if err := c.BindJSON(req); err != nil {
+		Error(c, 400, err)
+		return
+	}
+	err := h.us.UpdateProfile(user.ID, req.Name)
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	userUp, err := h.us.GetByID(uint(user.ID))
+	if err != nil {
+		Error(c, 500, err)
+		return
+	}
+	c.JSON(200, gin.H{
+		"id":userUp.ID,
+		"name":userUp.Name,
+		"email":userUp.Email,
 	})
 }
