@@ -6,15 +6,15 @@ services:
     container_name: gallery-db
     environment:
       MYSQL_ROOT_PASSWORD: password
-      MYSQL_DATABASE: gallerydb
-      MYSQL_USER: galleryadmin
+      MYSQL_DATABASE: gallery
+      MYSQL_USER: root
       MYSQL_PASSWORD: password
     command: >
       mysqld
       --character-set-server=utf8mb4
       --collation-server=utf8mb4_general_ci
     ports:
-      - "3308:3306"
+      - "3306:3306"
     restart: on-failure
     volumes:
       - "./data:/var/lib/mysql"
@@ -23,7 +23,7 @@ services:
     container_name: gallery-api
     environment:
       MODE: "prod"
-      DB_URL: "galleryadmin:password@tcp(db:3306)/gallerydb?parseTime=true"
+      DB_URL: "root:password@tcp(db:3306)/gallery?parseTime=true"
       HMAC_KEY: "secret"
     restart: always
     ports:
